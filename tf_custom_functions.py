@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
+import os
+from google.colab import drive
+import zipfile
+import pathlib
 
 ############################################################
 # Visualization Functions
@@ -90,3 +94,45 @@ def plot_accuracy_and_loss(history):
   plt.plot(epochs, history.history['loss'], label = "Train Loss")
   plt.plot(epochs, history.history['val_loss'], label = "Validation Loss")
   plt.legend()
+
+############################################################
+# Colab & Kaggle
+############################################################
+
+def connect_kaggle():
+  """
+  Connects to Kaggle via API key located in Google Drive.
+  """
+  # Mount Drive 
+  drive.mount('/content/drive')
+  # Set Kaggle configuration
+  os.environ['KAGGLE_CONFIG_DIR'] = '/content/drive/MyDrive/kaggle'
+
+############################################################
+# Data Preparation
+############################################################
+
+def extract_data(zip_file : str,
+                 data_path : str = '/content/data/'):
+  """
+  Extracts zipfile into data path given.
+
+  Args:
+    zip_file (str): Path of zip folder contains data.
+    data_path (str): Path data folder that data to be extracted.
+  """
+  # Create data folder if does not exist
+  data_path_ = pathlib.Path(data_path)
+  if data_path_.is_file():
+    print(f"{data_path_} folder already exists.")
+  else:
+    print(f"{data_path_} folder does not exist, creating new one...")
+    os.mkdir(data_path_)
+  
+  # Extract zipfile into data folder
+  print("Extracting the zip folder...")
+  zip_ref = zipfile.ZipFile(zip_file)
+  zip_ref.extractall(path = data_path_)
+  zip_ref.close()
+  print("Zip folder has extracted.")
+
