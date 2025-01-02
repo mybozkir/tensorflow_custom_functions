@@ -8,6 +8,7 @@ import os
 from google.colab import drive
 import zipfile
 import pathlib
+import datetime as dt
 
 ############################################################
 # Visualization Functions
@@ -129,10 +130,107 @@ def extract_data(zip_file : str,
     print(f"{data_path_} folder does not exist, creating new one...")
     os.mkdir(data_path_)
   
-  # Extract zipfile into data folder
-  print("Extracting the zip folder...")
-  zip_ref = zipfile.ZipFile(zip_file)
-  zip_ref.extractall(path = data_path_)
-  zip_ref.close()
-  print("Zip folder has extracted.")
+    # Extract zipfile into data folder
+    print("Extracting the zip folder...")
+    zip_ref = zipfile.ZipFile(zip_file)
+    zip_ref.extractall(path = data_path_)
+    zip_ref.close()
+    print("Zip folder has extracted.")
 
+
+def create_train_valid_test_df(train_path = train_path,
+                               validation_path = validation_path,
+                               test_path = test_path):
+  """
+  Creates train, validation and test datasets from folder paths.
+
+  Args:
+    train_path (Path): Path of train folder.
+    validation_path (Path): Path of validation folder.
+    test_path (Path): Path of test folder.
+
+  Returns:
+    (train_df, validation_df, test_df)
+  """
+  # Create train dataframe
+  train_image_paths = [str(pathlib.Path(path)) for path in list(train_path.glob('*/*'))]
+  train_image_labels = [path.parent.name for path in list(train_path.glob('*/*'))]
+
+  train_df = pd.DataFrame({
+      'image' : train_image_paths,
+      'label' : train_image_labels
+  })
+
+  # Create validation dataframe
+  validation_image_paths = [str(pathlib.Path(path)) for path in list(validation_path.glob('*/*'))]
+  validation_image_labels = [path.parent.name for path in list(validation_path.glob('*/*'))]
+
+  validation_df = pd.DataFrame({
+      'image' : validation_image_paths,
+      'label' : validation_image_labels
+  })
+
+  # Create test dataframe
+  test_image_paths = [str(pathlib.Path(path)) for path in list(test_path.glob('*/*'))]
+  test_image_labels = [path.parent.name for path in list(test_path.glob('*/*'))]
+
+  test_df = pd.DataFrame({
+      'image' : test_image_paths,
+      'label' : test_image_labels
+  })
+
+  # Print information about folders
+  print(f"There are {len(train_df)} images in train folder.")
+  print(f"There are {len(validation_df)} images in validation folder.")
+  print(f"There are {len(test_df)} images in test folder.")
+
+  return train_df, validation_df, test_df
+
+############################################################
+# Callbacks
+############################################################
+
+def create_tensorboard_callback(dir_name,
+                                experiment_name):
+  """
+  Creates TensorBoard callback to save model experimentation results
+  into related folder.
+  """
+  log_dir = dir_name + '/' + experiment_name + dt.datetime.now().strftime('%Y%m%d-%H%M%S')
+  tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir)
+  print(f"Saving TensorBoard log files to {log_dir}")
+  return tensorboard_callback
+
+############################################################
+# Model Creation
+############################################################
+
+def create_model(model_url,
+                 num_classes,
+                 image_shape):
+  """
+  Creates Keras Sequential from model URL.
+
+  Args:
+    model_url (str): URL of the model taken from Kaggle.
+    num_classes (int): Number of classes to be classified.
+    image_shape (Tuple): Input shape of images given in tuple format.
+  
+  Returns:
+    An uncompiled Keras Sequential model with model_url as feature extractor
+    layer and Dense output layer with num_classes output neurons.
+  """
+  # Download the pre-trained model and save it as a Keras layer
+  feature_extractor_layer = hub.KerasLayer(model_url,
+                                           trainable = False,
+                                           name = "feature_extractor_layer",
+                                           input_shape = image_shape)
+  
+  # Create our own model
+  model = tf.keras.Sequential([
+      feature_extractor_layer,
+      tf.keras.layers.Dense(num_classes, activation = 'softmax', name = 'output_layer')
+  ])
+
+  # Return the model
+  return model
