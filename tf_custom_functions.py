@@ -9,6 +9,7 @@ from google.colab import drive
 import zipfile
 import pathlib
 import datetime as dt
+import tensorflow as tf
 
 ############################################################
 # Visualization Functions
