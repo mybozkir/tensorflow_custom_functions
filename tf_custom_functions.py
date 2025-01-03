@@ -138,9 +138,9 @@ def extract_data(zip_file : str,
     print("Zip folder has extracted.")
 
 
-def create_train_valid_test_df(train_path = train_path,
-                               validation_path = validation_path,
-                               test_path = test_path):
+def create_train_valid_test_df(train_path,
+                               validation_path,
+                               test_path):
   """
   Creates train, validation and test datasets from folder paths.
 
