@@ -10,6 +10,8 @@ import zipfile
 import pathlib
 import datetime as dt
 import tensorflow as tf
+import shutil
+from pathlib import Path
 
 ############################################################
 # Visualization Functions
@@ -97,6 +99,27 @@ def plot_accuracy_and_loss(history):
   plt.plot(epochs, history.history['val_loss'], label = "Validation Loss")
   plt.legend()
 
+# Let's create a function to display Confusion Matrix
+def plot_confusion_matrix(y_true,
+                          y_pred,
+                          labels,
+                          figsize = (30, 30)):
+  """
+  Plots confusion matrix for classification projects.
+
+  Args:
+    y_true: True labels.
+    y_pred: Predicted labels.
+    labels: Class label names.
+    figsize: Figure size, defaults (30, 30).
+  """
+  ConfusionMatrixDisplay.from_predictions(y_true = y_true,
+                                          y_pred = y_pred,
+                                          display_labels = labels,
+                                          cmap = 'Blues',
+                                          xticks_rotation = 'vertical',
+                                          ax = plt.figure(figsize = figsize, dpi = 200).subplots())
+
 ############################################################
 # Colab & Kaggle
 ############################################################
@@ -115,7 +138,7 @@ def connect_kaggle():
 ############################################################
 
 def extract_data(zip_file : str,
-                 data_path : str = '/content/data/'):
+                 data_path : str = 'data/'):
   """
   Extracts zipfile into data path given.
 
@@ -138,42 +161,35 @@ def extract_data(zip_file : str,
     zip_ref.close()
     print("Zip folder has extracted.")
 
+def inspect_dir(path):
+  for dirpath, dirnames, filenames in os.walk(path):
+    print(f"There are {len(dirnames)} directories and {len(filenames)} images in '{dirpath}'")
 
-def create_train_valid_test_df(train_path,
-                               validation_path,
-                               test_path):
+def create_train_test_df(train_path : str,
+                         test_path : str,
+                         pattern : str = '*/*'):
   """
-  Creates train, validation and test datasets from folder paths.
+  Creates train and test datasets from folder paths.
 
   Args:
     train_path (Path): Path of train folder.
-    validation_path (Path): Path of validation folder.
     test_path (Path): Path of test folder.
 
   Returns:
     (train_df, validation_df, test_df)
   """
   # Create train dataframe
-  train_image_paths = [str(pathlib.Path(path)) for path in list(train_path.glob('*/*'))]
-  train_image_labels = [path.parent.name for path in list(train_path.glob('*/*'))]
+  train_image_paths = [str(Path(path)) for path in list(Path(train_path).glob(pattern))]
+  train_image_labels = [path.parent.name for path in list(Path(train_path).glob(pattern))]
 
   train_df = pd.DataFrame({
       'image' : train_image_paths,
       'label' : train_image_labels
   })
 
-  # Create validation dataframe
-  validation_image_paths = [str(pathlib.Path(path)) for path in list(validation_path.glob('*/*'))]
-  validation_image_labels = [path.parent.name for path in list(validation_path.glob('*/*'))]
-
-  validation_df = pd.DataFrame({
-      'image' : validation_image_paths,
-      'label' : validation_image_labels
-  })
-
   # Create test dataframe
-  test_image_paths = [str(pathlib.Path(path)) for path in list(test_path.glob('*/*'))]
-  test_image_labels = [path.parent.name for path in list(test_path.glob('*/*'))]
+  test_image_paths = [str(Path(path)) for path in list(Path(test_path).glob(pattern))]
+  test_image_labels = [path.parent.name for path in list(Path(test_path).glob(pattern))]
 
   test_df = pd.DataFrame({
       'image' : test_image_paths,
@@ -182,10 +198,93 @@ def create_train_valid_test_df(train_path,
 
   # Print information about folders
   print(f"There are {len(train_df)} images in train folder.")
-  print(f"There are {len(validation_df)} images in validation folder.")
   print(f"There are {len(test_df)} images in test folder.")
 
-  return train_df, validation_df, test_df
+  return train_df, test_df
+
+def create_train_test_dirs(root_data_path : str,
+                           new_data_path : str,
+                           train_path : str,
+                           test_path : str,
+                           train_split_size : float = 0.8,
+                           root_data_pattern: str = '*/*/*'):
+  """
+
+  Args:
+    root_data_path (str): Root data folder contains raw dataset.
+    new_data_path (str): New data folder to contains class folders with all
+                         images (witout train, val, test seperation).
+    train_path (str): Path for train directory to be created.
+    test_path (str): Path for test directory to be created.
+    train_split_size (float): Float value for percentage of train split size.
+    root_data_pattern (str): Folder pattern for the usage of glob.
+                             Ex: '*/*/*
+  """
+  # Create a list that contains all images
+  total_image_list = []
+  for image in Path(root_data_path).glob(root_data_pattern):
+    total_image_list.append(image)
+
+  # Copy all images into their class directories in new data path
+  new_data_dir = Path(new_data_path)
+
+  for idx, image in enumerate(total_image_list):
+    if image.is_file():
+      # Obtain class label
+      class_name = os.path.basename(os.path.dirname(image))
+
+      # Create target folder
+      target_dir = new_data_dir / class_name
+      target_dir.mkdir(parents = True, exist_ok = True)
+
+      # Create uniqueness for all files
+      unique_name = f"{image.parent.name}_{idx}_{image.name}"
+      target_file = target_dir / unique_name
+
+      # Copy files
+      shutil.copy(src = image,
+                  dst = target_file)
+
+  # Create class_labels list
+  class_labels = []
+  for dirpath, dirnames, filenames in os.walk(new_data_dir):
+    class_labels.append(dirnames)
+  class_labels = class_labels[0]
+  class_labels
+
+  # Create train and test paths
+  train_path = Path(train_path)
+  test_path = Path(test_path)
+
+  # Create train and test directories with class directories
+  for path in [train_path, test_path]:
+    path.mkdir(parents = True, exist_ok = True)
+
+    for class_ in class_labels:
+      class_path = path / class_
+      class_path.mkdir(parents = True, exist_ok = True)
+
+  # Copy files into class folders located in train and test directories
+  for dir in new_data_dir.iterdir():
+    image_list = list(dir.iterdir())
+    train_list = image_list[ : int(len(image_list) * train_split_size)+1]
+    test_list = image_list[int(len(image_list) * train_split_size)+1 : ]
+
+    for image in train_list:
+      shutil.copy(src = image,
+                  dst = train_path / dir.stem)
+
+    for image in test_list:
+      shutil.copy(src = image,
+                  dst = test_path / dir.stem)
+
+  # Create train and test lists
+  train_list = list(train_path.glob('*/*'))
+  test_list = list(test_path.glob('*/*'))
+
+  print(f"Train directory is created with {len(train_list)} in total.")
+  print(f"Test directory is created with {len(test_list)} in total.")
+  print(f"There are {len(train_list) + len(test_list)} images in total.")
 
 ############################################################
 # Callbacks
@@ -201,6 +300,28 @@ def create_tensorboard_callback(dir_name,
   tensorboard_callback = tf.keras.callbacks.TensorBoard(log_dir)
   print(f"Saving TensorBoard log files to {log_dir}")
   return tensorboard_callback
+
+# Firstful, let's create a function to create checkpoint callback.
+def create_checkpoint(checkpoint_path : str):
+  """
+  Creates Keras checkpoint callback to return to the point when necessary.
+  Saves best weights only, so model checkpoint path must be ended with
+  '.weights.h5'. Also monitors validation accuracy for the best results.
+
+  Args:
+    checkpoint_path (str): Filepath for saving checkpoint file.
+  
+  Returns:
+    ModelCheckpoint object.
+  """
+  checkpoint_callback = tf.keras.callbacks.ModelCheckpoint(
+      filepath = checkpoint_path,
+      save_weights_only = True,
+      monitor = 'val_accuracy',
+      save_best_only = True
+  )
+
+  return checkpoint_callback
 
 ############################################################
 # Model Creation
@@ -235,3 +356,51 @@ def create_model(model_url,
 
   # Return the model
   return model
+
+############################################################
+# Metrics
+############################################################
+
+def plot_metric(classification_report_dict,
+                metric,
+                class_names):
+  """
+  Plots any value among precision, recall, f1-score and support. One must give
+  the metric name directly among [precision, recall, f1-score, support].
+  Also returns sorted DataFrame for the metric type chosen with class labels.
+
+  Args:
+    classification_report_dict: Classification Report dictionary.
+    metric: Metric type to be visualized.
+    class_names = List of class names.
+  
+  Returns:
+    DataFrame: DataFrame of the sorted values of given metric.
+  """
+
+  # Create metric score dictionary
+  metric_scores = {}
+  for key, value in classification_report_dict.items():
+    if key == 'accuracy':
+      break
+    else:
+      metric_scores[class_names[int(key)]] = value[metric]
+  
+  # Create metric DataFrame
+  metric_df = pd.DataFrame({
+      'class_name' : list(metric_scores.keys()),
+      'metric' : list(metric_scores.values())
+  }).sort_values(by = 'metric', ascending = False).reset_index().drop('index', axis = 1)
+
+  plt.figure(figsize = (12, 6))
+  sns.barplot(data = metric_df,
+              x = 'class_name',
+              y = 'metric')
+  plt.title('F1-Score for Class Labels')
+  plt.xlabel('Class Names')
+  plt.ylabel(metric)
+  plt.xticks(rotation = 90)
+  plt.show()
+
+  # Return the DataFrame
+  return metric_df
