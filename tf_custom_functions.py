@@ -12,6 +12,7 @@ import datetime as dt
 import tensorflow as tf
 import shutil
 from pathlib import Path
+from sklearn.metrics import ConfusionMatrixDisplay
 
 ############################################################
 # Visualization Functions
@@ -98,6 +99,50 @@ def plot_accuracy_and_loss(history):
   plt.plot(epochs, history.history['loss'], label = "Train Loss")
   plt.plot(epochs, history.history['val_loss'], label = "Validation Loss")
   plt.legend()
+
+def compare_histories(base_history,
+                      fine_tune_history,
+                      initial_epochs = 5):
+  """
+  Compares accuracy and loss values of the model for before and after
+  fine tuning.
+  """
+  # Get base history accuracy and loss values
+  base_train_acc = base_history.history['accuracy']
+  base_train_loss = base_history.history['loss']
+
+  base_val_acc = base_history.history['val_accuracy']
+  base_val_loss = base_history.history['val_loss']
+
+  # Get fine-tuned history aaccuracy and loss values
+  fine_tune_train_acc = fine_tune_history.history['accuracy']
+  fine_tune_train_loss = fine_tune_history.history['loss']
+
+  fine_tune_val_acc = fine_tune_history.history['val_accuracy']
+  fine_tune_val_loss = fine_tune_history.history['val_loss']
+
+  # Combine accuracy and loss values
+  total_train_acc = base_train_acc + fine_tune_train_acc
+  total_val_acc = base_val_acc + fine_tune_val_acc
+
+  total_train_loss = base_train_loss + fine_tune_train_loss
+  total_val_loss = base_val_loss + fine_tune_val_loss
+
+  # Create plots
+  plt.figure(figsize = (8, 8))
+  plt.subplot(2, 1, 1)
+  plt.plot(total_train_acc, label = 'Training Accuracy')
+  plt.plot(total_val_acc, label = 'Validation Accuracy')
+  plt.plot([initial_epochs - 1, initial_epochs - 1], plt.ylim(), label = 'Start Fine Tuning')
+  plt.legend(loc = 'lower right')
+  plt.title('Training and Validation Accuracy')
+
+  plt.subplot(2, 1, 2)
+  plt.plot(total_train_loss, label = 'Training Loss')
+  plt.plot(total_val_loss, label = 'Validation Loss')
+  plt.plot([initial_epochs - 1, initial_epochs - 1], plt.ylim(), label = 'Start Fine Tuning')
+  plt.legend(loc = 'lower right')
+  plt.title('Training and Validation Loss');
 
 # Let's create a function to display Confusion Matrix
 def plot_confusion_matrix(y_true,
